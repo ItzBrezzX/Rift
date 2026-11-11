@@ -1,0 +1,10 @@
+services:
+  port-engine:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PORT_ENGINE_DATA_DIR: /data
+      PORT_ENGINE_MAX_UPLOAD_BYTES: "1073741824"
+    volumes:
+      - ./data:/data
