@@ -337,13 +337,21 @@ def analyze_files(files: list[InventoryFile], archive_name: str = "inventory") -
         or any(p.endswith(".jar") for p in paths)
         or _suffix(paths, "pom.xml")
         or any(p.endswith(".class") for p in paths)
+        or any(p.endswith("meta-inf/manifest.mf") for p in paths)
     ):
         if _suffix(paths, "pom.xml"):
             evidence.append(Evidence("java-pom", "metadata", 22, "Maven pom.xml."))
         if any(p.endswith(".java") for p in paths):
             evidence.append(Evidence("java-source", "structure", 16, "Java source."))
         if any(p.endswith(".jar") for p in paths):
-            evidence.append(Evidence("java-jar", "signature", 18, "JAR archive."))
+            # JAR alone must clear the global weight floor (≥24).
+            evidence.append(Evidence("java-jar", "signature", 26, "JAR archive."))
+        if any(p.endswith(".class") for p in paths):
+            evidence.append(Evidence("java-class", "signature", 14, "Compiled .class files."))
+        if any(p.endswith("meta-inf/manifest.mf") for p in paths):
+            evidence.append(
+                Evidence("java-manifest", "structure", 10, "META-INF/MANIFEST.MF.")
+            )
         if any("lwjgl" in p for p in paths):
             evidence.append(Evidence("java-lwjgl", "dependency", 14, "LWJGL present."))
             runtime = "lwjgl"
