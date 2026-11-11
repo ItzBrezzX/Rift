@@ -1,14 +1,144 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0a0a" />
-    <meta name="description" content="Rift Upload — extract a ZIP and push the project tree to GitHub from your browser." />
-    <title>Rift Upload</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KingBrezz Port Engine</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #101410;
+  --surface: #181f1a;
+  --raised: #212a24;
+  --line: #314037;
+  --fg: #e7f0e8;
+  --muted: #93a399;
+  --brass: #e0a100;
+  --brass-ink: #1c1500;
+  --ok: #3f9d6a;
+  --warn: #d4a24a;
+  --bad: #d4654a;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+}
+main { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+.brand { color: var(--brass); font-weight: 700; letter-spacing: .12em; font-size: .75rem; font-family: ui-monospace, monospace; }
+h1 { font-size: clamp(1.8rem, 5vw, 2.8rem); margin: .5rem 0; }
+.muted { color: var(--muted); line-height: 1.55; }
+.panel {
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 22px;
+}
+.drop {
+  display: block;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  text-align: center;
+  background: var(--raised);
+  cursor: pointer;
+}
+input[type=file] { max-width: 100%; margin: 14px auto; color: var(--fg); }
+button {
+  border: 0;
+  border-radius: 10px;
+  background: var(--brass);
+  color: var(--brass-ink);
+  font-weight: 700;
+  padding: 12px 18px;
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: wait; }
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 16px;
+  color: var(--fg);
+  font-size: .85rem;
+  max-height: 480px;
+  overflow: auto;
+}
+.tag {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--brass);
+  font-size: .75rem;
+  font-family: ui-monospace, monospace;
+}
+footer { margin-top: 28px; color: var(--muted); font-size: .85rem; }
+.warn { color: var(--warn); font-size: .9rem; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">KINGBREZZ · V0.2.0</div>
+  <h1>Port Engine</h1>
+  <p class="muted">
+    Analyze PC game project archives and discover realistic Android porting paths.
+    This tool does not convert Windows players into APKs.
+  </p>
+  <div class="panel">
+    <span class="tag">Project Analyzer</span>
+    <h2>Analyze a project ZIP</h2>
+    <form id="form">
+      <label class="drop" for="file">
+        Choose a ZIP project archive
+        <input id="file" name="file" type="file" accept=".zip" required>
+      </label>
+      <button id="submit" type="submit">Analyze project</button>
+    </form>
+    <p class="muted" id="status" role="status">
+      Archives are analyzed on this server. Use only files you have rights to process.
+    </p>
+    <p class="warn">
+      Detection is not a successful port. native_apk_buildable_from_upload_alone is always false.
+    </p>
+    <pre id="result" aria-live="polite">Waiting for a project…</pre>
+  </div>
+  <footer>
+    KingBrezz Port Engine · Analysis does not guarantee a successful Android build.
+  </footer>
+</main>
+<script>
+const form = document.querySelector("#form");
+const file = document.querySelector("#file");
+const button = document.querySelector("#submit");
+const status = document.querySelector("#status");
+const result = document.querySelector("#result");
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!file.files.length) return;
+  button.disabled = true;
+  status.textContent = "Uploading and analyzing…";
+  result.textContent = "";
+  try {
+    const body = new FormData();
+    body.append("file", file.files[0]);
+    const response = await fetch("/api/analyze", { method: "POST", body });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || "Analysis failed");
+    result.textContent = JSON.stringify(data, null, 2);
+    status.textContent = "Analysis complete. Review strategy, findings, and the plan. No APK was produced.";
+  } catch (err) {
+    status.textContent = "Could not analyze project.";
+    result.textContent = String(err);
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
 </html>
