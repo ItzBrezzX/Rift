@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rift Upload</title>
+    <script>
+      // GitHub Pages SPA fallback: redirect unknown paths to index with path in query
+      sessionStorage.setItem("rift_spa_redirect", location.pathname + location.search + location.hash);
+      location.replace(location.pathname.replace(/\/[^/]*$/, "/") || "/");
+    </script>
+  </head>
+  <body></body>
+</html>

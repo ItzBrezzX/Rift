@@ -1,153 +1,105 @@
-# KingBrezz Port Engine
+# Rift Upload
 
-**Version 0.2.0**
+Upload an entire project ZIP to any GitHub repository from your browser (Android or desktop).
 
-Self-hosted platform that inspects PC game projects and reports an **honest** Android porting path.
+**No OAuth app. No backend. No Git. No Termux.**
 
-It is an analyzer, a compatibility checker, and a toolchain gate.  
-It is **not** a universal EXE-to-APK converter.
+1. Paste a Personal Access Token  
+2. Enter `owner/repo`  
+3. Select a `.zip`  
+4. Upload  
 
----
-
-## What it does
-
-1. Accepts a ZIP and rejects path traversal, symlinks, encryption, and compression bombs.
-2. Classifies the input as a source project, Windows player, Android package, web project, Java project, or unknown.
-3. Scores evidence for Unity, Unreal, Godot, GameMaker, Ren'Py, RPG Maker, Cocos, Defold, libGDX, MonoGame, LÖVE, Electron, HTML5, Java, .NET, and custom C/C++.
-4. Reads PE machine type, import names, and the CLR directory from a binary prefix. **Never executes the file.**
-5. Writes a porting plan whose commands are **not** run unless you later point a real toolchain at them.
-6. Fails an `android_package` job when Unity, Unreal, Godot, the Android SDK, NDK, or JDK is missing. **Does not create an APK.**
+Files are extracted in the browser and committed in **one** Git Data API transaction.
 
 ---
 
-## What it cannot do
+## Use
 
-- Turn `GameAssembly.dll`, `UnityPlayer.dll`, or `*-Win64-Shipping.exe` into a native Android package.
-- Download Unity, Unreal, the NDK, Wine, or Winlator.
-- Prove that a structurally valid APK launches.
-- Call a compatibility runtime a native port.
-- Report `native_apk_buildable_from_upload_alone: true` (always false).
+### 1. Create a GitHub token
 
----
+https://github.com/settings/tokens
 
-## Quick start
+| Token type | Permission |
+|------------|------------|
+| Classic | **`repo`** scope |
+| Fine-grained | **Contents: Read and write** on the target repo |
+
+### 2. Run locally
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+npm install
+npm run dev
 ```
 
-Open `http://127.0.0.1:8000`.
+Open the URL Vite prints (usually `http://127.0.0.1:5173`).
+
+### 3. Deploy to GitHub Pages
 
 ```bash
-pytest -q
+npm run build
 ```
 
-### Docker
+Push `dist/` to the `gh-pages` branch, or use the included GitHub Actions workflow
+(Settings → Pages → Source: **GitHub Actions**).
+
+For a project site at `https://USER.github.io/REPO/`:
 
 ```bash
-docker compose up --build
+VITE_BASE_PATH=/REPO/ npm run build
 ```
 
 ---
 
-## API
+## How upload works
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/health` | Service health |
-| GET | `/api/toolchain` | SDK/editor probe |
-| GET | `/api/engines` | Engine adapter matrix |
-| POST | `/api/analyze` | Multipart field `file` (ZIP) |
-| GET | `/api/reports/{id}` | Saved report |
-| POST | `/api/jobs` | `{"report_id","target"}` |
-| GET | `/api/jobs/{id}` | Job status |
+```
+GET    /repos/{owner}/{repo}/branches/{branch}
+POST   /repos/.../git/blobs          (each file, concurrent)
+POST   /repos/.../git/trees          (base_tree + new paths)
+POST   /repos/.../git/commits
+PATCH  /repos/.../git/refs/heads/{branch}
+```
 
-**Job targets:** `analysis_report` · `android_package` · `validate_android_package`
-
-**Environment**
-
-| Variable | Default |
-|----------|---------|
-| `PORT_ENGINE_DATA_DIR` | `data` |
-| `PORT_ENGINE_MAX_UPLOAD_BYTES` | 1 GiB |
-
-**Toolchain probe (not auto-executed)**
-
-| Variable | Tool |
-|----------|------|
-| `UNITY_EDITOR` | Unity editor binary |
-| `UE_ROOT` | Unreal engine root (RunUAT) |
-| `GODOT_BIN` | Godot binary |
-| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK |
-| `ANDROID_NDK_HOME` | NDK |
-| `JAVA_HOME` | JDK |
+- **`base_tree`** keeps files that are **not** in the ZIP.  
+- Empty repos are seeded once via the Contents API, then the same flow runs.  
+- Path traversal (`..`, absolute paths) is rejected.  
+- Per-file limit ≈ 95 MiB (GitHub blob limit is 100 MiB).
 
 ---
 
-## Detection method
+## Security
 
-Evidence is scored by layer (signature, structure, metadata, binary, dependency):
-
-```
-confidence = sum(weights) / (sum(weights) + 36)
-           + 0.03 if 2 layers, +0.06 if ≥3 layers
-           capped at 0.97
-```
-
-Candidates under total weight 24 are dropped. One filename is never enough.
-
-**Strategies**
-
-| Strategy | Meaning |
-|----------|---------|
-| `native_engine_export` | Source project; vendor has an Android exporter |
-| `project_migration` | Possible only after code/packaging changes |
-| `compatibility_layer` | Windows player — Wine/Winlator/Box64 are experiments, not ports |
-| `generic_preparation` | Inventory + manual checklist |
-| `already_android` | Validate existing package structure |
+| Rule | Implementation |
+|------|----------------|
+| Token not hardcoded | Entered by the user |
+| Token not in localStorage | React state only; **Clear token** wipes it |
+| Token not sent to third parties | Only `api.github.com` |
+| Token never logged | UI never prints the secret |
+| ZIP safety | `validatePath` rejects `..`, absolutes, NUL |
 
 ---
 
-## Layout
+## Example
 
-```
-app/
-  main.py              FastAPI surface
-  analyzer.py          v0.1 compatibility imports
-  detection/analyzer.py  Multi-signal classifier
-  pe/parser.py         Static PE inspection
-  security/archive.py  ZIP-slip, bombs, symlinks
-  adapters/registry.py Engine adapters (no fake builds)
-  jobs/runner.py       Job state machine
-  static/index.html    Minimal web UI
-tests/test_engine.py
-docs/
-```
+| Field | Value |
+|-------|--------|
+| Token | `ghp_…` |
+| Repository | `ItzBrezzX/Rift` |
+| Branch | `main` |
+| ZIP | `KingBrezz-Port-Engine-v0.2.0.zip` |
+
+Result: every file and folder from the archive appears on `main` under one commit.
 
 ---
 
-## Termux / mobile hosts
+## Stack
 
-You can run **analysis** on small archives. You cannot cook Unity or Unreal on a phone. Use a Linux or Windows build machine with the editor installed.
-
----
-
-## Documentation
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [INSTALLATION.md](INSTALLATION.md)
-- [SUPPORTED_ENGINES.md](SUPPORTED_ENGINES.md)
-- [PORTING_GUIDE.md](PORTING_GUIDE.md)
-- [ANDROID_BUILD_GUIDE.md](ANDROID_BUILD_GUIDE.md)
-- [SECURITY.md](SECURITY.md)
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- [CHANGELOG.md](CHANGELOG.md)
+- React 18 + TypeScript + Vite  
+- JSZip  
+- GitHub REST / Git Data API  
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT
